@@ -1,8 +1,6 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.models.chat import ChatRequest
 from app.models.common import APIResponse
@@ -10,14 +8,12 @@ from app.services.chat_service import ChatService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 chat_service = ChatService()
 
 
 @router.post("/chat", response_model=APIResponse)
-@limiter.limit("10/minute")
 async def chat(request: Request, body: ChatRequest) -> APIResponse:
-    """법률 상담 채팅 엔드포인트 (분당 10회 제한)"""
+    """법률 상담 채팅 엔드포인트 (rate limit은 main.py의 limiter가 처리)"""
     try:
         result = await chat_service.process_chat(
             session_id=body.session_id,

@@ -39,6 +39,8 @@ export interface ChatRequest {
 export interface ChatResponseData {
   session_id: string
   message: Message
+  mode: 'ai_analysis' | 'precedent_only'
+  llm_provider: string
 }
 
 export interface APIResponse<T = unknown> {

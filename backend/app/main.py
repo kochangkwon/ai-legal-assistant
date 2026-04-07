@@ -17,8 +17,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
+# Rate Limiter (전역 — 모든 엔드포인트에 기본 적용)
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[settings.rate_limit],
+)
 
 app = FastAPI(
     title=settings.app_name,
