@@ -23,6 +23,11 @@ class SupabaseService:
 
     def __init__(self):
         self._client: Client | None = None
+        if not settings.supabase_service_role_key:
+            logger.warning(
+                "SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. "
+                "anon key로는 RLS 정책에 의해 데이터 접근이 차단될 수 있습니다."
+            )
 
     @property
     def client(self) -> Client:

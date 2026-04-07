@@ -1,10 +1,11 @@
+import asyncio
 import json
 import logging
 import uuid
 
 from app.config import settings
 from app.models.chat import ChatResponse, MessageResponse, PrecedentInfo
-from app.services.keyword_extractor import extract_keywords
+from app.services.keyword_extractor import extract_keywords, CATEGORY_LAW_NAMES
 from app.services.law_mcp_service import LawMCPService
 from app.services.llm_service import LLMService
 from app.services.supabase_service import SupabaseService
@@ -51,12 +52,35 @@ class ChatService:
         keywords = extract_keywords(message, category)
         logger.info("키워드 추출 (규칙 기반): %s", keywords)
 
-        # 2. 판례 검색
+        # 2. 판례 검색 + 법령 검색 (병렬)
         search_query = " ".join(keywords)
-        logger.info("판례 검색: %s", search_query)
-        precedent_results = await self.law_mcp_service.search_precedents(
-            search_query, count=5
+        law_names = CATEGORY_LAW_NAMES.get(category, [])
+        law_search_query = law_names[0] if law_names else search_query
+        logger.info("판례/법령 검색: %s", search_query)
+
+        precedent_results, law_results = await asyncio.gather(
+            self.law_mcp_service.search_precedents(search_query, count=5),
+            self.law_mcp_service.search_law(law_search_query),
+            return_exceptions=True,
         )
+
+        if isinstance(precedent_results, Exception):
+            logger.error("판례 검색 실패: %s", precedent_results)
+            precedent_results = []
+        if isinstance(law_results, Exception):
+            logger.error("법령 검색 실패: %s", law_results)
+            law_results = []
+
+        # 법령 컨텍스트 구성
+        laws_context = ""
+        if law_results and isinstance(law_results, list):
+            law_texts = []
+            for item in law_results[:2]:
+                if isinstance(item, dict):
+                    text = item.get("text", "")
+                    if text:
+                        law_texts.append(str(text)[:1000])
+            laws_context = "\n\n".join(law_texts) if law_texts else ""
 
         # 3. 상위 판례 전문 조회 (최대 3건, 캐시 우선)
         precedent_texts = []
@@ -141,7 +165,7 @@ class ChatService:
             answer = await self.llm_service.generate_legal_response(
                 question=message,
                 precedents=precedents_context,
-                laws="",
+                laws=laws_context,
                 category=category,
                 conversation_history=conversation_history,
             )

@@ -12,9 +12,12 @@ law_mcp_service = LawMCPService()
 supabase_service = SupabaseService()
 
 
-@router.get("/precedent/search/{query}", response_model=APIResponse)
-async def search_precedents(query: str, count: int = Query(default=5, ge=1, le=20)) -> APIResponse:
-    """판례 검색 (고정 경로를 동적 경로보다 먼저 등록)"""
+@router.get("/precedent/search", response_model=APIResponse)
+async def search_precedents(
+    query: str = Query(..., min_length=1, description="검색어"),
+    count: int = Query(default=5, ge=1, le=20),
+) -> APIResponse:
+    """판례 검색 (query parameter 방식 — 경로 충돌 방지)"""
     try:
         results = await law_mcp_service.search_precedents(query, count=count)
         return APIResponse(success=True, data=results)

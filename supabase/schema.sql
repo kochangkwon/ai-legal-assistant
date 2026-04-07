@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- 채팅 세션
 CREATE TABLE IF NOT EXISTS chat_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE DEFAULT NULL,
   category TEXT NOT NULL CHECK (category IN ('civil', 'criminal', 'family', 'labor', 'realestate')),
   title TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -121,6 +121,21 @@ CREATE POLICY "Service role full access to messages"
 
 CREATE POLICY "Service role can manage precedent cache"
   ON precedent_cache FOR ALL USING (auth.role() = 'service_role');
+
+-- ============================================
+-- 4-1. 개발용 임시 정책 (Auth 미적용 단계, Auth 연동 후 제거)
+-- ============================================
+
+CREATE POLICY "Allow sessions without user_id (dev)"
+  ON chat_sessions FOR ALL
+  USING (user_id IS NULL)
+  WITH CHECK (user_id IS NULL);
+
+CREATE POLICY "Allow messages for sessions without user_id (dev)"
+  ON messages FOR ALL
+  USING (
+    session_id IN (SELECT id FROM chat_sessions WHERE user_id IS NULL)
+  );
 
 CREATE POLICY "Service role can manage llm usage"
   ON llm_usage FOR ALL USING (auth.role() = 'service_role');

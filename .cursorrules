@@ -1,50 +1,55 @@
-# AI Legal Assistant - Cursor Rules v1.0
+# AI Legal Assistant - Cursor Rules v2.0
 
 ## 프로젝트
 한국 법률 판례 기반 AI 법률 자문 모바일 앱
 - mobile/: React Native + Expo (TypeScript)
 - backend/: FastAPI (Python 3.11+)
-- 법률 데이터: korean-law-mcp Docker 컨테이너 (localhost:3000)
+- 법률 데이터: korean-law-mcp Docker (localhost:3000)
+- AI: Gemini 2.5 Flash (무료 티어) — LLM 추상화로 교체 가능
+
+## LLM 추상화
+- 모든 LLM 호출은 llm_service.py 경유 (직접 호출 금지)
+- .env의 LLM_PROVIDER로 전환: "gemini" | "claude"
+- Gemini 안전 필터 차단 → 판례 나열 모드 fallback
+- 일일 사용량 추적 필수 (무료 250회/일)
 
 ## 코드 스타일
 
 ### TypeScript (mobile/)
 - strict mode, no semicolons
 - 함수형 컴포넌트 + hooks only
-- Zustand for UI state, React Query for server state
+- React Query for server state
 - Expo Router (파일 기반 라우팅)
-- StyleSheet.create for styles (inline 최소화)
+- StyleSheet.create for styles
+- 마크다운 렌더링 지원 (Gemini 응답 형식)
 - 컴포넌트: PascalCase.tsx, 훅: useCamelCase.ts
-- import 순서: react → react-native → expo → 외부 → 내부
 
 ### Python (backend/)
 - python3 (not python), pip3 --break-system-packages
-- Type hints mandatory, Pydantic v2 models
-- async/await only (no sync functions in routers/services)
-- Logger only (no print statements)
-- import 순서: stdlib → third-party → local
+- Type hints mandatory, Pydantic v2
+- async/await only
+- Logger only (no print)
+- Gemini 호출 시 safety_settings 반드시 설정
 
-## API 설계 규칙
-- 모든 응답: { success: bool, data: any, error: string | null }
-- korean-law-mcp 호출 → backend/app/services/law_mcp_service.py
-- Claude API 호출 → backend/app/services/claude_service.py
-- 환경변수 하드코딩 절대 금지 → config.py에서 관리
+## API 설계
+- 응답 포맷: { success: bool, data: any, error: str | null }
+- 응답에 mode 포함: "ai_analysis" | "precedent_only"
+- 키워드 추출: LLM 미사용, 규칙 기반 (keyword_extractor.py)
 
-## 법률 도메인 규칙
-- 면책 고지 누락 금지: "법률 정보 제공 목적이며 법률 자문을 대체하지 않습니다"
+## 법률 도메인
+- 면책 고지 누락 금지
 - "법률 자문" 표현 금지 → "법률 정보 제공"
 - 판례 인용 시 사건번호/선고일/법원명 필수
-- 판례 링크: https://www.law.go.kr 공식 링크만 사용
 
 ## 파일 수정 주의
+- LLM 관련 수정 → llm_service.py + 해당 provider만 수정
 - API 스키마 변경 → mobile/types/ + backend/models/ 양쪽 동시
 - .env 변경 → .env.example 동시 업데이트
-- 새 의존성 → requirements.txt 또는 package.json 반영
 
 ## 금지 사항
 - 환경변수 하드코딩
-- print() 사용 (logger 사용)
+- LLM 직접 호출 (llm_service.py 우회)
+- print() 사용
 - 동기 함수로 API 호출
-- inline style 남용
 - any 타입 남용
 - "법률 자문" 표현
