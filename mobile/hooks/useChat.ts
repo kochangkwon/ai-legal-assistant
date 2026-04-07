@@ -1,15 +1,48 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Message, LegalCategory } from '../types'
-import { sendChatMessage } from '../services/api'
+import { sendChatMessage, getSessionMessages } from '../services/api'
 
-export function useChat(category: LegalCategory) {
+interface UseChatOptions {
+  category: LegalCategory
+  existingSessionId?: string
+}
+
+export function useChat(categoryOrOptions: LegalCategory | UseChatOptions) {
+  const category = typeof categoryOrOptions === 'string'
+    ? categoryOrOptions
+    : categoryOrOptions.category
+  const existingSessionId = typeof categoryOrOptions === 'string'
+    ? undefined
+    : categoryOrOptions.existingSessionId
+
   const [messages, setMessages] = useState<Message[]>([])
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(existingSessionId || null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState('')
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+
+  // 기존 세션이면 이전 메시지 로드
+  useEffect(() => {
+    if (!existingSessionId) return
+
+    async function loadMessages() {
+      setIsLoadingHistory(true)
+      try {
+        const response = await getSessionMessages(existingSessionId!)
+        if (response.success && response.data?.messages) {
+          setMessages(response.data.messages)
+          setSessionId(existingSessionId!)
+        }
+      } catch {
+        // 로드 실패 시 빈 상태로 시작
+      } finally {
+        setIsLoadingHistory(false)
+      }
+    }
+    loadMessages()
+  }, [existingSessionId])
 
   const sendMessage = useCallback(async (text: string) => {
-    // 사용자 메시지 추가
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -30,7 +63,7 @@ export function useChat(category: LegalCategory) {
         setSessionId(response.data.session_id)
         setMessages(prev => [...prev, response.data.message])
       }
-    } catch (error) {
+    } catch {
       setMessages(prev => [
         ...prev,
         {
@@ -45,5 +78,5 @@ export function useChat(category: LegalCategory) {
     }
   }, [sessionId, category])
 
-  return { messages, isLoading, loadingStep, sendMessage, sessionId }
+  return { messages, isLoading, isLoadingHistory, loadingStep, sendMessage, sessionId }
 }

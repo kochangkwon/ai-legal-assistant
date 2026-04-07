@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.models.common import APIResponse
 from app.services.law_mcp_service import LawMCPService
@@ -35,7 +35,7 @@ async def get_precedent(precedent_id: str) -> APIResponse:
 
 
 @router.get("/precedent/search/{query}", response_model=APIResponse)
-async def search_precedents(query: str, count: int = 5) -> APIResponse:
+async def search_precedents(query: str, count: int = Query(default=5, ge=1, le=20)) -> APIResponse:
     """판례 검색"""
     try:
         results = await law_mcp_service.search_precedents(query, count=count)

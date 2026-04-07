@@ -61,6 +61,9 @@ class ClaudeService:
                 max_tokens=2048,
                 messages=[{"role": "user", "content": prompt}],
             )
+            if not response.content:
+                logger.error("Claude 응답이 비어있습니다")
+                return "죄송합니다. 답변을 생성하지 못했습니다. 잠시 후 다시 시도해주세요."
             return response.content[0].text
         except Exception as e:
             logger.error("법률 답변 생성 실패: %s", e)

@@ -82,3 +82,24 @@ class LawMCPService:
         except Exception as e:
             logger.error("유사 판례 검색 실패 (id=%s): %s", prec_id, e)
             return []
+
+    async def search_interpretations(self, query: str, count: int = 5) -> list[dict]:
+        """법령해석례 검색"""
+        try:
+            result = await self._call_tool("search_interpretations", {
+                "query": query,
+                "display": count,
+            })
+            return result.get("result", {}).get("content", [])
+        except Exception as e:
+            logger.error("법령해석례 검색 실패 (query=%s): %s", query, e)
+            return []
+
+    async def summarize_precedent(self, prec_id: str) -> list[dict]:
+        """판례 요약"""
+        try:
+            result = await self._call_tool("summarize_precedent", {"id": prec_id})
+            return result.get("result", {}).get("content", [])
+        except Exception as e:
+            logger.error("판례 요약 실패 (id=%s): %s", prec_id, e)
+            return []

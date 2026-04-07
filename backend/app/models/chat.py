@@ -1,10 +1,14 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+LegalCategory = Literal["civil", "criminal", "family", "labor", "realestate"]
 
 
 class ChatRequest(BaseModel):
     """채팅 요청 모델"""
     session_id: str | None = None
-    category: str = Field(..., description="법률 분야: civil, criminal, family, labor, realestate")
+    category: LegalCategory = Field(..., description="법률 분야")
     message: str = Field(..., min_length=1, max_length=2000)
 
 

@@ -1,7 +1,11 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.routers import chat, history, precedent
@@ -13,16 +17,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title=settings.app_name,
     description="한국 법률 판례 기반 AI 법률 정보 제공 서비스",
     version="1.0.0",
 )
 
-# CORS 설정
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "data": None,
+            "error": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+        },
+    )
+
+
+# CORS 설정 (환경변수 기반)
+origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

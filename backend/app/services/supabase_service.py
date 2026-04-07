@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -9,8 +10,16 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _get_client() -> Client:
+    """Supabase 클라이언트 생성 (모듈 레벨 캐시)"""
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_service_role_key or settings.supabase_key,
+    )
+
+
 class SupabaseService:
-    """Supabase 데이터베이스 연동 서비스"""
+    """Supabase 데이터베이스 연동 서비스 (asyncio.to_thread로 비동기 래핑)"""
 
     def __init__(self):
         self._client: Client | None = None
@@ -18,10 +27,7 @@ class SupabaseService:
     @property
     def client(self) -> Client:
         if self._client is None:
-            self._client = create_client(
-                settings.supabase_url,
-                settings.supabase_service_role_key or settings.supabase_key,
-            )
+            self._client = _get_client()
         return self._client
 
     # ============================================
@@ -39,32 +45,41 @@ class SupabaseService:
         if user_id:
             data["user_id"] = user_id
 
-        result = self.client.table("chat_sessions").insert(data).execute()
+        result = await asyncio.to_thread(
+            lambda: self.client.table("chat_sessions").insert(data).execute()
+        )
         logger.info("세션 생성: %s", session_id)
         return result.data[0] if result.data else data
 
     async def update_session_title(self, session_id: str, title: str) -> None:
         """세션 제목 업데이트 (첫 질문에서 자동 생성)"""
-        self.client.table("chat_sessions").update(
-            {"title": title}
-        ).eq("id", session_id).execute()
+        await asyncio.to_thread(
+            lambda: self.client.table("chat_sessions")
+            .update({"title": title})
+            .eq("id", session_id)
+            .execute()
+        )
 
     async def get_user_sessions(self, user_id: str | None = None) -> list[dict]:
         """사용자의 채팅 세션 목록 조회"""
-        query = self.client.table("chat_sessions").select(
-            "id, category, title, created_at"
-        ).order("created_at", desc=True)
 
-        if user_id:
-            query = query.eq("user_id", user_id)
+        def _query():
+            q = (
+                self.client.table("chat_sessions")
+                .select("id, category, title, created_at")
+                .order("created_at", desc=True)
+            )
+            if user_id:
+                q = q.eq("user_id", user_id)
+            return q.limit(50).execute()
 
-        result = query.limit(50).execute()
+        result = await asyncio.to_thread(_query)
         return result.data or []
 
     async def get_session(self, session_id: str) -> dict | None:
         """특정 세션 조회"""
-        result = (
-            self.client.table("chat_sessions")
+        result = await asyncio.to_thread(
+            lambda: self.client.table("chat_sessions")
             .select("*")
             .eq("id", session_id)
             .maybe_single()
@@ -92,13 +107,15 @@ class SupabaseService:
         if precedents:
             data["precedents"] = precedents
 
-        result = self.client.table("messages").insert(data).execute()
+        result = await asyncio.to_thread(
+            lambda: self.client.table("messages").insert(data).execute()
+        )
         return result.data[0] if result.data else data
 
     async def get_session_messages(self, session_id: str) -> list[dict]:
         """세션의 메시지 목록 조회"""
-        result = (
-            self.client.table("messages")
+        result = await asyncio.to_thread(
+            lambda: self.client.table("messages")
             .select("id, role, content, precedents, created_at")
             .eq("session_id", session_id)
             .order("created_at", desc=False)
@@ -129,8 +146,8 @@ class SupabaseService:
     async def get_cached_precedent(self, precedent_id: str) -> dict | None:
         """캐시된 판례 조회 (만료 확인)"""
         now = datetime.now(timezone.utc).isoformat()
-        result = (
-            self.client.table("precedent_cache")
+        result = await asyncio.to_thread(
+            lambda: self.client.table("precedent_cache")
             .select("*")
             .eq("id", precedent_id)
             .gte("expires_at", now)
@@ -143,7 +160,9 @@ class SupabaseService:
 
     async def cache_precedent(self, precedent: dict) -> None:
         """판례 캐시 저장 (upsert)"""
-        self.client.table("precedent_cache").upsert(precedent).execute()
+        await asyncio.to_thread(
+            lambda: self.client.table("precedent_cache").upsert(precedent).execute()
+        )
         logger.debug("판례 캐시 저장: %s", precedent.get("id"))
 
     async def get_session_with_message_count(
@@ -152,10 +171,10 @@ class SupabaseService:
         """세션 목록 + 메시지 수 조회"""
         sessions = await self.get_user_sessions(user_id)
         for session in sessions:
-            count_result = (
-                self.client.table("messages")
+            count_result = await asyncio.to_thread(
+                lambda sid=session["id"]: self.client.table("messages")
                 .select("id", count="exact")
-                .eq("session_id", session["id"])
+                .eq("session_id", sid)
                 .execute()
             )
             session["message_count"] = count_result.count or 0

@@ -1,4 +1,4 @@
-import { APIResponse, ChatRequest, ChatResponseData } from '../types'
+import { APIResponse, ChatRequest, ChatResponseData, ChatSession, Message } from '../types'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -29,14 +29,19 @@ export async function sendChatMessage(
   })
 }
 
-export async function getHistory(): Promise<APIResponse<unknown[]>> {
-  return fetchAPI<unknown[]>('/api/history')
+export async function getHistory(): Promise<APIResponse<ChatSession[]>> {
+  return fetchAPI<ChatSession[]>('/api/history')
+}
+
+interface SessionDetail {
+  session: ChatSession
+  messages: Message[]
 }
 
 export async function getSessionMessages(
   sessionId: string,
-): Promise<APIResponse<unknown[]>> {
-  return fetchAPI<unknown[]>(`/api/history/${sessionId}`)
+): Promise<APIResponse<SessionDetail>> {
+  return fetchAPI<SessionDetail>(`/api/history/${sessionId}`)
 }
 
 export async function getPrecedent(

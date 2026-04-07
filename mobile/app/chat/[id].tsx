@@ -8,6 +8,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { useChat } from '../../hooks/useChat'
@@ -19,9 +20,16 @@ import DisclaimerBanner from '../../components/chat/DisclaimerBanner'
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const category = (id || 'civil') as LegalCategory
+
+  // 카테고리 ID인지 세션 ID(UUID)인지 판별
+  const isCategory = LEGAL_CATEGORIES.some(c => c.id === id)
+  const category = (isCategory ? id : 'civil') as LegalCategory
+  const existingSessionId = isCategory ? undefined : id
+
   const categoryInfo = LEGAL_CATEGORIES.find(c => c.id === category)
-  const { messages, isLoading, loadingStep, sendMessage } = useChat(category)
+  const { messages, isLoading, isLoadingHistory, loadingStep, sendMessage } = useChat(
+    existingSessionId ? { category, existingSessionId } : category
+  )
   const [inputText, setInputText] = useState('')
   const flatListRef = useRef<FlatList<Message>>(null)
 
@@ -32,7 +40,16 @@ export default function ChatScreen() {
     sendMessage(text)
   }
 
-  const isEmpty = messages.length === 0 && !isLoading
+  const isEmpty = messages.length === 0 && !isLoading && !isLoadingHistory
+
+  if (isLoadingHistory) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a90d9" />
+        <Text style={styles.loadingText}>이전 대화를 불러오는 중...</Text>
+      </View>
+    )
+  }
 
   return (
     <KeyboardAvoidingView
@@ -142,6 +159,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  // 로딩 상태
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 15,
+    color: '#888',
   },
   // 빈 상태
   emptyContainer: {
