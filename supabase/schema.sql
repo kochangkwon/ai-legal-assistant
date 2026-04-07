@@ -26,7 +26,18 @@ CREATE TABLE IF NOT EXISTS messages (
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
   precedents JSONB,
+  llm_provider TEXT DEFAULT 'gemini',
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- LLM 사용량 추적 테이블
+CREATE TABLE IF NOT EXISTS llm_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  called_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 판례 캐시 테이블 (API 호출 최소화)

@@ -4,8 +4,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """애플리케이션 설정 (환경변수에서 로드)"""
 
-    # Claude API
-    anthropic_api_key: str
+    # LLM 설정
+    llm_provider: str = "gemini"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash-preview-05-20"
+    anthropic_api_key: str = ""
+    claude_model: str = "claude-sonnet-4-20250514"
 
     # korean-law-mcp
     law_oc: str = ""

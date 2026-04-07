@@ -3,9 +3,11 @@ import logging
 import uuid
 
 from app.models.chat import ChatResponse, MessageResponse, PrecedentInfo
-from app.services.claude_service import ClaudeService
+from app.services.keyword_extractor import extract_keywords
 from app.services.law_mcp_service import LawMCPService
+from app.services.llm_service import LLMService
 from app.services.supabase_service import SupabaseService
+from app.services.usage_tracker import usage_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ class ChatService:
     """채팅 비즈니스 로직"""
 
     def __init__(self):
-        self.claude_service = ClaudeService()
+        self.llm_service = LLMService()
         self.law_mcp_service = LawMCPService()
         self.supabase_service = SupabaseService()
 
@@ -24,7 +26,7 @@ class ChatService:
         category: str,
         message: str,
     ) -> ChatResponse:
-        """채팅 처리 파이프라인: 키워드 추출 → 판례 검색 → 답변 생성 → 이력 저장"""
+        """채팅 처리 파이프라인: 키워드 추출(규칙) → 판례 검색 → 답변 생성 → 이력 저장"""
 
         is_new_session = session_id is None
         if not session_id:
@@ -44,9 +46,9 @@ class ChatService:
                 session_id, limit=6
             )
 
-        # 1. 키워드 추출
-        logger.info("키워드 추출 시작: %s", message[:50])
-        keywords = await self.claude_service.extract_keywords(category, message)
+        # 1. 키워드 추출 (규칙 기반, LLM 미사용)
+        keywords = extract_keywords(message, category)
+        logger.info("키워드 추출 (규칙 기반): %s", keywords)
 
         # 2. 판례 검색
         search_query = " ".join(keywords)
@@ -119,25 +121,40 @@ class ChatService:
                     "category": category,
                 })
 
-        # 4. 법률 답변 생성
+        # 4. 답변 생성 (LLM 한도 확인)
         precedents_context = (
             "\n\n---\n\n".join(precedent_texts)
             if precedent_texts
             else "관련 판례를 찾지 못했습니다."
         )
-        logger.info("법률 답변 생성 시작 (판례 %d건)", len(precedent_texts))
 
-        answer = await self.claude_service.generate_legal_response(
-            category=category,
-            user_message=message,
-            precedents=precedents_context,
-            conversation_history=conversation_history,
-        )
+        if usage_tracker.can_call():
+            logger.info(
+                "LLM 답변 생성 (%s, 남은 횟수: %d)",
+                self.llm_service.provider_name,
+                usage_tracker.remaining(),
+            )
+            answer = await self.llm_service.generate_legal_response(
+                question=message,
+                precedents=precedents_context,
+                laws="",
+                category=category,
+                conversation_history=conversation_history,
+            )
+            usage_tracker.record_call()
+        else:
+            # 한도 초과 → 판례 나열 모드
+            logger.warning("LLM 일일 한도 초과 — 판례 나열 모드로 전환")
+            answer = self._fallback_response(precedent_infos, precedents_context)
 
         # 5. AI 답변 저장
         precedent_dicts = [p.model_dump() for p in precedent_infos]
         saved_msg = await self.supabase_service.save_message(
-            session_id, "assistant", answer, precedent_dicts
+            session_id,
+            "assistant",
+            answer,
+            precedent_dicts,
+            llm_provider=self.llm_service.provider_name,
         )
 
         # 6. 첫 메시지면 세션 제목 자동 생성
@@ -154,3 +171,27 @@ class ChatService:
                 precedents=precedent_infos,
             ),
         )
+
+    def _fallback_response(
+        self, precedent_infos: list[PrecedentInfo], precedents_context: str
+    ) -> str:
+        """LLM 한도 초과 시 판례 나열 응답"""
+        if not precedent_infos:
+            return (
+                "현재 AI 분석 서비스가 일시적으로 제한되어 있습니다. "
+                "관련 판례를 찾지 못했습니다. 잠시 후 다시 시도해주세요.\n\n"
+                "본 내용은 법률 정보 제공 목적이며, 변호사의 법률 자문을 대체하지 않습니다."
+            )
+
+        lines = ["**검색된 관련 판례**\n"]
+        for i, p in enumerate(precedent_infos, 1):
+            lines.append(
+                f"{i}. [{p.court}] {p.case_number} ({p.decided_at})\n"
+                f"   {p.summary}\n"
+            )
+        lines.append(
+            "\n> AI 분석 서비스가 일일 한도에 도달하여 판례 원문만 제공합니다. "
+            "자세한 분석이 필요하시면 내일 다시 이용해 주세요.\n\n"
+            "본 내용은 법률 정보 제공 목적이며, 변호사의 법률 자문을 대체하지 않습니다."
+        )
+        return "\n".join(lines)

@@ -97,6 +97,7 @@ class SupabaseService:
         role: str,
         content: str,
         precedents: list[dict] | None = None,
+        llm_provider: str | None = None,
     ) -> dict[str, Any]:
         """메시지 저장"""
         data: dict[str, Any] = {
@@ -106,6 +107,8 @@ class SupabaseService:
         }
         if precedents:
             data["precedents"] = precedents
+        if llm_provider:
+            data["llm_provider"] = llm_provider
 
         result = await asyncio.to_thread(
             lambda: self.client.table("messages").insert(data).execute()
