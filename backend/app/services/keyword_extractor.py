@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """규칙 기반 키워드 추출 (LLM 미사용 — 비용 절감)"""
 
 # 법률 분야별 키워드 매핑

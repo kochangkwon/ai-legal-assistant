@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """LLM API 일일 사용량 추적 (무료 티어 한도 관리)"""
 
 import asyncio
