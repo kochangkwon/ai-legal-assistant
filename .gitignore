@@ -43,5 +43,8 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# External MCP (별도 clone)
+korean-law-mcp/
+
 # Supabase
 supabase/.temp/
