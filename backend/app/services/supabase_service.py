@@ -168,6 +168,28 @@ class SupabaseService:
         )
         logger.debug("판례 캐시 저장: %s", precedent.get("id"))
 
+    # ============================================
+    # LLM 사용량
+    # ============================================
+
+    async def record_llm_usage(
+        self, provider: str, model: str,
+        input_tokens: int | None = None, output_tokens: int | None = None,
+    ) -> None:
+        """LLM 사용량 기록"""
+        await asyncio.to_thread(
+            lambda: self.client.table("llm_usage").insert({
+                "provider": provider,
+                "model": model,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            }).execute()
+        )
+
+    # ============================================
+    # 세션 + 메시지 수
+    # ============================================
+
     async def get_session_with_message_count(
         self, user_id: str | None = None
     ) -> list[dict]:

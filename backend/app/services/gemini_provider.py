@@ -39,10 +39,21 @@ class GeminiProvider(LLMProvider):
         try:
             response = await asyncio.to_thread(_call)
 
+            # 안전 필터 차단 확인
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                 logger.warning(
                     "Gemini 안전 필터 차단: %s", response.prompt_feedback.block_reason
                 )
+                return self._safety_fallback_message()
+
+            # candidates 빈 배열 방어
+            if not response.candidates:
+                logger.warning("Gemini 응답에 candidates가 없습니다")
+                return self._safety_fallback_message()
+
+            candidate = response.candidates[0]
+            if not candidate.content or not candidate.content.parts:
+                logger.warning("Gemini candidate에 content/parts가 없습니다")
                 return self._safety_fallback_message()
 
             return response.text

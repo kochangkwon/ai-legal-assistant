@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 
+from app.config import settings
 from app.models.chat import ChatResponse, MessageResponse, PrecedentInfo
 from app.services.keyword_extractor import extract_keywords
 from app.services.law_mcp_service import LawMCPService
@@ -128,11 +129,14 @@ class ChatService:
             else "관련 판례를 찾지 못했습니다."
         )
 
-        if usage_tracker.can_call():
+        mode = "ai_analysis"
+
+        if await usage_tracker.try_consume():
+            remaining = await usage_tracker.remaining()
             logger.info(
                 "LLM 답변 생성 (%s, 남은 횟수: %d)",
                 self.llm_service.provider_name,
-                usage_tracker.remaining(),
+                remaining,
             )
             answer = await self.llm_service.generate_legal_response(
                 question=message,
@@ -141,11 +145,17 @@ class ChatService:
                 category=category,
                 conversation_history=conversation_history,
             )
-            usage_tracker.record_call()
+
+            # LLM 사용량 DB 기록
+            await self.supabase_service.record_llm_usage(
+                provider=self.llm_service.provider_name,
+                model=getattr(settings, f"{self.llm_service.provider_name}_model", ""),
+            )
         else:
             # 한도 초과 → 판례 나열 모드
             logger.warning("LLM 일일 한도 초과 — 판례 나열 모드로 전환")
             answer = self._fallback_response(precedent_infos, precedents_context)
+            mode = "precedent_only"
 
         # 5. AI 답변 저장
         precedent_dicts = [p.model_dump() for p in precedent_infos]
@@ -170,6 +180,8 @@ class ChatService:
                 content=answer,
                 precedents=precedent_infos,
             ),
+            mode=mode,
+            llm_provider=self.llm_service.provider_name,
         )
 
     def _fallback_response(

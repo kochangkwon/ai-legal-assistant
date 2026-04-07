@@ -34,3 +34,5 @@ class ChatResponse(BaseModel):
     """채팅 응답 모델"""
     session_id: str
     message: MessageResponse
+    mode: Literal["ai_analysis", "precedent_only"] = "ai_analysis"
+    llm_provider: str = "gemini"

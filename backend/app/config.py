@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # LLM 설정
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash-preview-05-20"
+    gemini_model: str = "gemini-2.5-flash"
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
 
