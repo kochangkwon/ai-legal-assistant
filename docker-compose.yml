@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  law-mcp:
+    build:
+      context: ./korean-law-mcp
+    environment:
+      - LAW_OC=${LAW_OC}
+      - PORT=3000
+      - CORS_ORIGIN=http://localhost:8000
+      - RATE_LIMIT_RPM=120
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LAW_MCP_URL=http://law-mcp:3000/mcp
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - law-mcp
+    restart: unless-stopped
