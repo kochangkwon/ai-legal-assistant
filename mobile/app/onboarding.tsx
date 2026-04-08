@@ -50,14 +50,14 @@ export default function OnboardingScreen() {
     if (currentPage < SLIDES.length - 1) {
       setCurrentPage(currentPage + 1)
     } else {
+      // 상태만 변경 — _layout.tsx의 useEffect가 라우팅 처리
       await completeOnboarding()
-      router.replace('/(tabs)')
     }
   }
 
   const handleSkip = async () => {
+    // 상태만 변경 — _layout.tsx의 useEffect가 라우팅 처리
     await completeOnboarding()
-    router.replace('/(tabs)')
   }
 
   const slide = SLIDES[currentPage]

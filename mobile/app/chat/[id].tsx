@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useNavigation } from 'expo-router'
 import { useChat } from '../../hooks/useChat'
 import { LegalCategory, Message } from '../../types'
 import { LEGAL_CATEGORIES } from '../../constants/categories'
@@ -27,6 +27,15 @@ export default function ChatScreen() {
   const existingSessionId = isCategory ? undefined : id
 
   const categoryInfo = LEGAL_CATEGORIES.find(c => c.id === category)
+  const navigation = useNavigation()
+
+  // 헤더에 법률 분야 표시
+  React.useEffect(() => {
+    navigation.setOptions({
+      title: categoryInfo ? `${categoryInfo.icon} ${categoryInfo.label} 상담` : '법률 상담',
+    })
+  }, [navigation, categoryInfo])
+
   const { messages, isLoading, isLoadingHistory, loadingStep, sendMessage } = useChat(
     existingSessionId ? { category, existingSessionId } : category
   )
