@@ -11,14 +11,48 @@ logger = logging.getLogger(__name__)
 
 
 class LawMCPService:
-    """korean-law-mcp 서버 연동 서비스"""
+    """korean-law-mcp 서버 연동 서비스 (MCP v3 Streamable HTTP)"""
 
     def __init__(self):
         self.mcp_url = settings.law_mcp_url
+        self._session_id: str | None = None
+
+    async def _ensure_session(self, client: httpx.AsyncClient) -> None:
+        """MCP 세션 초기화 (최초 1회)"""
+        if self._session_id:
+            return
+
+        response = await client.post(
+            self.mcp_url,
+            json={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "clientInfo": {"name": "ai-legal-assistant", "version": "1.0"},
+                },
+                "id": 0,
+            },
+            headers={
+                "Accept": "application/json, text/event-stream",
+            },
+        )
+        response.raise_for_status()
+        self._session_id = response.headers.get("mcp-session-id")
+        logger.info("MCP 세션 초기화 완료: %s", self._session_id)
 
     async def _call_tool(self, tool_name: str, arguments: dict) -> dict[str, Any]:
-        """MCP 도구 호출"""
+        """MCP 도구 호출 (세션 기반)"""
         async with httpx.AsyncClient(timeout=30.0) as client:
+            await self._ensure_session(client)
+
+            headers: dict[str, str] = {
+                "Accept": "application/json, text/event-stream",
+            }
+            if self._session_id:
+                headers["mcp-session-id"] = self._session_id
+
             response = await client.post(
                 self.mcp_url,
                 json={
@@ -30,7 +64,27 @@ class LawMCPService:
                     },
                     "id": 1,
                 },
+                headers=headers,
             )
+
+            # 세션 만료 시 재초기화
+            if response.status_code == 400:
+                logger.warning("MCP 세션 만료 — 재초기화")
+                self._session_id = None
+                await self._ensure_session(client)
+                if self._session_id:
+                    headers["mcp-session-id"] = self._session_id
+                response = await client.post(
+                    self.mcp_url,
+                    json={
+                        "jsonrpc": "2.0",
+                        "method": "tools/call",
+                        "params": {"name": tool_name, "arguments": arguments},
+                        "id": 1,
+                    },
+                    headers=headers,
+                )
+
             response.raise_for_status()
             return response.json()
 
