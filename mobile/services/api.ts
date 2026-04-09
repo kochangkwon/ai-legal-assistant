@@ -1,6 +1,6 @@
 import { APIResponse, ChatRequest, ChatResponseData, ChatSession, Message } from '../types'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8100'
 
 async function fetchAPI<T>(
   endpoint: string,

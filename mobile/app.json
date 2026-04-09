@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AI 법률 도우미",
+    "name": "LegalAI",
     "slug": "ai-legal-assistant",
     "scheme": "ai-legal-assistant",
     "version": "1.0.0",
@@ -14,7 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.ai-legal-assistant"
     },
     "android": {
       "adaptiveIcon": {

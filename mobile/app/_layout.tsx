@@ -46,7 +46,7 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="chat/[id]"
-        options={{ title: '법률 상담' }}
+        options={{ title: '' }}
       />
       <Stack.Screen
         name="precedent/[id]"

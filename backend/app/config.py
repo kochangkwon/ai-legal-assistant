@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # 앱 설정
     app_name: str = "AI Legal Assistant"
     debug: bool = False
-    cors_origins: str = "http://localhost:8081,http://localhost:19006"
+    cors_origins: str = "http://localhost:8081,http://localhost:19006,http://localhost:8100"
     rate_limit: str = "10/minute"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
